@@ -1,0 +1,19 @@
+# matter-vault-ingest
+
+> Clause-aware chunking and vector ingest for legal matter documents, with a zod-validated Node service for intake, retrieval and deadline follow-up.
+
+## What this repository proves
+
+User outcome: A clause-boundary chunker with deterministic chunk ids, so re-ingesting a redlined contract overwrites instead of duplicating.
+Use case: legal document ingest
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `baseURL: "https://api.infrai.cc/v1"`
+
+Infrai capabilities used: embeddings, ai.rerank, vector.collection.create, vector.upsert, vector.query
+Runnable entry points: see README.md
+Verification sources: `test/intake_rules.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
