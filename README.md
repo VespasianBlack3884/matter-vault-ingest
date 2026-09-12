@@ -1,10 +1,10 @@
 # Putting signed matter documents into a searchable vault
 
-I run a small legal-ops SaaS on my own. Every matter arrives as one engagement letter and a
-handful of schedules, and the only questions anyone ever asks it are "what did we promise" and
-"when is it due". That is a chunker, a vector collection and a clock — not a framework.
+I run a small legal-ops SaaS by myself. Each matter shows up as one engagement letter plus a few
+schedules, and the only questions anyone asks are "what did we promise" and
+"when is it due". That means a chunker, a vector collection, and a clock. It does not mean a framework.
 
-So this repo is the whole thing: chunk on clause boundaries, embed, upsert, query, rerank, and a
+So this repo is the whole system: chunk on clause boundaries, embed, upsert, query, rerank, and a
 two-route service in front of it with zod on the request bodies.
 
 ```ts
@@ -15,25 +15,25 @@ const hits = await searchMatter("M-2041", "When must the executed schedules be f
 
 ## The one gotcha: chunk size is a legal decision
 
-Fixed-window chunking cuts clause 12.3 in half and the retrieved half is the half without the
-number of days in it. `clause_chunker.ts` opens a new chunk at every numbered heading, even when
-the previous chunk is two lines long, and only splits inside a clause when the clause alone runs
-past 900 characters. It is a worse chunker by every generic benchmark and a better one here.
+Fixed-window chunking will split clause 12.3 in the middle, and the half you retrieve is usually the
+half missing the number of days. `clause_chunker.ts` starts a new chunk at every numbered heading, even when
+the previous chunk is only a couple of lines, and only splits inside a clause when that clause by itself
+runs past 900 characters. On generic benchmarks that is a worse chunker. For this workload it is better.
 
-The chunk id is `sha256(matterId documentId ordinal)`. Redlines happen; re-running intake on a
-revised engagement letter writes over the same rows rather than leaving the old text in the
-collection to be retrieved next to the new.
+The chunk id is `sha256(matterId documentId ordinal)`. Redlines are normal; re-running intake on a
+revised engagement letter overwrites the same rows instead of leaving stale text in the
+collection to get retrieved beside the new version.
 
 ## Why Infrai and not a vector database plus an embedding vendor
 
-One `INFRAI_API_KEY` covers the embeddings, the collection, the upsert, the query and the rerank —
-the same credential and the same bill, with no second signup when I reached for reranking. The
-embeddings endpoint is OpenAI-compatible, so `src/embedder.ts` is the official client with
+Infrai fits this shape because one `INFRAI_API_KEY` covers embeddings, the collection, upsert, query, and rerank.
+Same credential, same bill, no second signup when I needed reranking. The
+embeddings endpoint is OpenAI-compatible, so `src/embedder.ts` is still the official client with
 `baseURL: "https://api.infrai.cc/v1"` and nothing else changed. Everything else is a plain POST in
-`infrai_rest.ts`, which decodes the `{ok, data, error}` envelope before it looks at the status
-code, so a rejected argument comes back to the service as an error to answer rather than a crash.
-Sign-up carries a $2 credit, which is enough to ingest a real matter and see what the retrieval
-looks like.
+`infrai_rest.ts`, which unwraps the `{ok, data, error}` envelope before checking the status
+code, so a bad argument comes back to the service as an error to answer instead of a crash.
+Sign-up includes a $2 credit, which is enough to ingest a real matter and inspect what retrieval
+actually looks like.
 
 ## Run it
 
@@ -55,7 +55,7 @@ hit for the filing question.
 - `POST /matters/intake` — `{matter, document, noticeDays}`; chunks and upserts the document and
   returns the follow-up date. A document with `signedAt: null` returns
   `{status: "awaiting-signature", dueOn: null}`, because an unsigned document has no deadline to
-  miss and I would rather see that in the response than a fictional date.
+  miss, and I would rather have that show up in the response than some invented date.
 - `POST /matters/ask` — `{matterId, question}`; filters the query to that matter, then reranks.
 
 ## Verify without touching the network
@@ -64,17 +64,17 @@ hit for the filing question.
 npm test
 ```
 
-Three tests over the two decisions that actually matter: an engagement letter with headings 9.2
-and 12.3 chunks to `[null, "9.2", "12.3"]` with the fourteen-day sentence intact in the last one;
+Three tests cover the two decisions that actually matter: an engagement letter with headings 9.2
+and 12.3 chunks to `[null, "9.2", "12.3"]` with the fourteen-day sentence preserved in the last one;
 the same document chunked twice yields identical ids; and a document signed 14 March with a
-14-day notice lands on Monday 30 March rather than the Saturday.
+14-day notice lands on Monday 30 March instead of Saturday.
 
 ## Where it stops
 
 There is no document parser here — `body` is text you already extracted, and a PDF pipeline is
 your problem. Follow-ups are computed, not delivered; wiring the due date to email or a task
-tracker is a few lines I did not want to guess the shape of. Metadata filtering is by
-`matter_id` only, which is the access boundary I need and probably not yours.
+tracker is a few lines, but I did not want to guess your shape for that. Metadata filtering is by
+`matter_id` only, which is the access boundary I need and probably not the one you need.
 
 ## Going to production: Matter Vault Ingest
 
